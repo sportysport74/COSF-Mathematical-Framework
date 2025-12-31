@@ -1,100 +1,139 @@
-﻿from mpmath import mp, sqrt, exp, power, log
-mp.dps = 100
+"""
+Find REAL convergences between φⁿ and eᵐ
+WHERE m is a "nice" number (integer, half-integer, or simple fraction)
+NOT the trivial m = ln(φⁿ)
+"""
 
-phi = (1 + sqrt(5)) / 2
+import numpy as np
+import pandas as pd
+from math import sqrt, log, exp
 
-print("SEARCHING FOR ACTUAL CONVERGENCE...")
-print("=" * 80)
+# Constants
+PHI = (1 + sqrt(5)) / 2
+COSF = 5465.701174755326
 
-# Check what n gives us ~5473
-print("\nFinding which n gives φⁿ ≈ 5000-6000:")
-print("-" * 80)
+def find_real_convergences():
+    """
+    Search for convergences where m is restricted to nice values
+    """
+    results = []
 
-for n in range(1, 30):
-    phi_n = power(phi, n)
-    
-    if 3000 < float(phi_n) < 10000:
-        # Find best m for this n
-        m_target = float(log(phi_n))
-        e_m = exp(m_target)
-        
-        ratio = phi_n / e_m
-        deviation = abs(ratio - 1) * 100
-        
-        print(f"n={n:2d}: φⁿ={float(phi_n):10.2f}, best m={float(m_target):.2f}, "
-              f"ratio={float(ratio):.6f}, dev={float(deviation):.4f}%")
+    # Search parameters
+    n_range = range(1, 51)  # Powers of φ
 
-print("\n" + "=" * 80)
-print("CHECKING CONVERGENCES WHERE φⁿ/eᵐ  1 (searching m around n/2):")
-print("=" * 80)
+    # Nice m values: integers, half-integers, thirds
+    nice_m_values = []
+    for i in range(1, 101):  # m from 0.1 to 50
+        nice_m_values.append(i * 0.1)  # Tenths
+        nice_m_values.append(i * 0.5)  # Halves
+        nice_m_values.append(i / 3.0)  # Thirds
 
-convergences = []
+    nice_m_values = sorted(set(nice_m_values))
 
-for n in range(5, 25):
-    phi_n = power(phi, n)
-    
-    # Try m values around n/2
-    for m_tenths in range(int(n*4), int(n*6)):
-        m = m_tenths / 10.0
-        e_m = exp(m)
-        ratio = phi_n / e_m
-        deviation = abs(ratio - 1) * 100
-        
-        if deviation < 1.0:
-            convergences.append({
-                'n': n,
-                'm': m,
-                'phi_n': float(phi_n),
-                'e_m': float(e_m),
-                'ratio': float(ratio),
-                'deviation': float(deviation)
-            })
+    print(f"Searching {len(n_range)} powers of φ against {len(nice_m_values)} nice m values...")
+    print(f"Total combinations: {len(n_range) * len(nice_m_values):,}\n")
 
-# Sort by deviation
-convergences.sort(key=lambda x: x['deviation'])
+    for n in n_range:
+        phi_n = PHI ** n
 
-print("\nFOUND CONVERGENCES (φⁿ/eᵐ within 1%):")
-print("-" * 80)
-for c in convergences[:10]:
-    print(f"n={c['n']:2d}, m={c['m']:5.1f}: φⁿ={c['phi_n']:12.2f}, "
-          f"eᵐ={c['e_m']:12.2f}, dev={c['deviation']:.4f}%")
+        for m in nice_m_values:
+            e_m = exp(m)
 
-print("\n" + "=" * 80)
-print("CHECKING OUR ORIGINAL CLAIM (n=17, m=8.6):")
-print("=" * 80)
+            # Calculate deviation
+            if e_m > 0:
+                deviation = abs(phi_n - e_m) / e_m
+            else:
+                continue
 
-phi_17 = power(phi, 17)
-e_86 = exp(mp.mpf('8.6'))
+            # Store if reasonably close (within 5%)
+            if deviation < 0.05:
+                results.append({
+                    'n': n,
+                    'm': m,
+                    'phi_n': phi_n,
+                    'e_m': e_m,
+                    'deviation_pct': deviation * 100,
+                    'ratio': phi_n / e_m,
+                    'm_type': classify_m(m)
+                })
 
-print(f"φ = {float(phi_17):.10f}")
-print(f"e^8.6 = {float(e_86):.10f}")
-print(f"φ/e^8.6 = {float(phi_17/e_86):.10f}")
-print(f"Deviation = {float(abs(phi_17/e_86 - 1)*100):.6f}%")
+    return results
 
-print("\n" + "=" * 80)
-print("CRITICAL INSIGHT:")
-print("=" * 80)
+def classify_m(m):
+    """Classify what kind of 'nice' number m is"""
+    if abs(m - round(m)) < 0.001:
+        return "integer"
+    elif abs(m - round(m * 2) / 2) < 0.001:
+        return "half-integer"
+    elif abs(m - round(m * 3) / 3) < 0.001:
+        return "third"
+    elif abs(m - round(m * 10) / 10) < 0.001:
+        return "tenth"
+    else:
+        return "other"
 
-# The issue: we need φⁿ/eᵐ  1, not φⁿ  eᵐ!
-# So if φ  3571 and we want ratio  1, we need e^m  3571
-# That means m  ln(3571)  8.18
+def main():
+    print("=" * 70)
+    print("REAL CONVERGENCE FINDER")
+    print("Finding φⁿ ≈ eᵐ where m is a 'nice' number")
+    print("=" * 70)
+    print()
 
-correct_m = float(log(phi_17))
-e_correct = exp(correct_m)
-correct_ratio = phi_17 / e_correct
+    results = find_real_convergences()
 
-print(f"For n=17 (φ={float(phi_17):.2f}):")
-print(f"  Optimal m = ln(φ) = {correct_m:.4f}")
-print(f"  e^{correct_m:.4f} = {float(e_correct):.2f}")
-print(f"  φ/e^{correct_m:.4f} = {float(correct_ratio):.10f}")
-print(f"  Deviation = {float(abs(correct_ratio-1)*100):.6f}%")
+    if not results:
+        print("No convergences found!")
+        return
 
-print("\n" + "=" * 80)
-print("RELATIONSHIP TO COSF:")
-print("=" * 80)
-COSF = 42800 / 7.83
-print(f"COSF = {COSF:.2f}")
-print(f"φ = {float(phi_17):.2f}")
-print(f"e^8.6 = {float(e_86):.2f}")
-print(f"\nCOSF/φ = {COSF/float(phi_17):.6f}")
-print(f"COSF/e^8.6 = {COSF/float(e_86):.6f}")
+    # Convert to DataFrame and sort
+    df = pd.DataFrame(results)
+    df = df.sort_values('deviation_pct')
+
+    print(f"\n{'=' * 70}")
+    print(f"FOUND {len(df)} REAL CONVERGENCES (within 5% deviation)")
+    print(f"{'=' * 70}\n")
+
+    # Show top 20 closest convergences
+    print("TOP 20 CLOSEST CONVERGENCES:")
+    print("-" * 70)
+    for idx, row in df.head(20).iterrows():
+        print(f"n={row['n']:2d}, m={row['m']:6.2f} ({row['m_type']:12s}): "
+              f"φ^{row['n']} = {row['phi_n']:12.2f}, "
+              f"e^{row['m']:.2f} = {row['e_m']:12.2f}, "
+              f"dev = {row['deviation_pct']:6.3f}%")
+
+    # Special check: Does COSF appear?
+    print(f"\n{'=' * 70}")
+    print("CHECKING COSF POSITION...")
+    print(f"{'=' * 70}")
+    print(f"COSF = {COSF:.2f}")
+
+    for n in range(1, 51):
+        phi_n = PHI ** n
+        if abs(phi_n - COSF) / COSF < 0.5:  # Within 50%
+            print(f"  φ^{n} = {phi_n:.2f} (deviation from COSF: {abs(phi_n - COSF)/COSF*100:.2f}%)")
+
+    # Group by m_type
+    print(f"\n{'=' * 70}")
+    print("CONVERGENCES BY M TYPE:")
+    print(f"{'=' * 70}")
+    for m_type in ['integer', 'half-integer', 'third', 'tenth']:
+        subset = df[df['m_type'] == m_type]
+        if len(subset) > 0:
+            print(f"\n{m_type.upper()}: {len(subset)} convergences")
+            print("-" * 70)
+            for idx, row in subset.head(5).iterrows():
+                print(f"  n={row['n']:2d}, m={row['m']:6.2f}: "
+                      f"φ^{row['n']} = {row['phi_n']:12.2f}, "
+                      f"e^{row['m']:.2f} = {row['e_m']:12.2f}, "
+                      f"dev = {row['deviation_pct']:6.3f}%")
+
+    # Save results
+    output_file = 'real_convergences.csv'
+    df.to_csv(output_file, index=False)
+    print(f"\n{'=' * 70}")
+    print(f"Results saved to: {output_file}")
+    print(f"{'=' * 70}")
+
+if __name__ == "__main__":
+    main()
